@@ -1,0 +1,23 @@
+# Use lightweight Node.js Alpine base image
+FROM node:18-alpine
+
+# Set working directory inside container
+WORKDIR /app
+
+# Copy package.json and package-lock.json (if exists)
+COPY package*.json ./
+
+# Install only production dependencies
+RUN npm install --production
+
+# Copy all source files into container
+COPY . .
+
+# Set environment to production
+ENV NODE_ENV=production
+
+# Expose port 4000 (your room-service port)
+EXPOSE 4000
+
+# Start the application
+CMD ["node", "src/index.js"]
