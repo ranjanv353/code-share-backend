@@ -6,7 +6,6 @@ import { generateRoomId, generateRoomName } from "../db/roomUtils.js";
 
 const router = express.Router();
 
-// Utility: Remove undefined fields deeply from any object or array
 function removeUndefined(obj) {
   if (!obj || typeof obj !== "object") return obj;
   if (Array.isArray(obj)) return obj.map(removeUndefined);

@@ -1,7 +1,7 @@
 export default function registerRoomSocketHandlers(io, socket) {
   socket.on("join-room", ({ roomId }) => {
     socket.join(roomId);
-    console.log(`👥 ${socket.userEmail} joined room ${roomId}`);
+    console.log(`${socket.userEmail} joined room ${roomId}`);
     console.log(`Rooms for ${socket.id}:`, Array.from(socket.rooms));
 
     socket.to(roomId).emit("user-joined", {

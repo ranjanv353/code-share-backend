@@ -33,7 +33,7 @@ router.get('/:id', async (req, res, next) => {
   console.log('Gateway headers sent:', {
   authorization: req.headers.authorization,
   'x-id-token': req.headers['x-id-token'],
-  'x-user-email': req.headers['x-user-email'], // this comes from decoded token in middleware
+  'x-user-email': req.headers['x-user-email'], 
 });
   const ROOM_SERVICE_URL = process.env.ROOM_SERVICE_URL;
   try {
@@ -116,7 +116,6 @@ router.delete('/:id', async (req, res, next) => {
       `${ROOM_SERVICE_URL}/rooms/${req.params.id}`,
       { headers: userHeaders(req) }
     );
-    // 204 No Content returns empty, but for consistency, just send status
     res.sendStatus(response.status);
   } catch (err) {
     if (err.response) {
