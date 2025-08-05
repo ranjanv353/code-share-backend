@@ -1,7 +1,11 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import roomRoutes from "./routes/rooms.js"
+import { createServer } from "http";
+import { Server as SocketIO } from "socket.io";
+
+import roomRoutes from "./routes/rooms.js";
+import registerSocketHandlers from "./sockets/index.js"; 
 
 dotenv.config();
 
@@ -13,7 +17,9 @@ app.use(express.json());
 
 app.use('/rooms', roomRoutes);
 
-app.get('/health', (req,res) => {res.send("Room service is running")});
+app.get('/health', (req, res) => {
+  res.send("Room service is running");
+});
 
 app.use((err, req, res, next) => {
   console.error('[Room Service Error]', err);
@@ -22,8 +28,18 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, ()=>{
-    console.log(`Room service is listening on port ${PORT}`);
+
+const httpServer = createServer(app);
+const io = new SocketIO(httpServer, {
+  cors: {
+    origin: process.env.FRONTEND_ORIGIN || "*",
+    methods: ["GET", "POST"],
+  },
 });
 
 
+registerSocketHandlers(io);
+
+httpServer.listen(PORT, () => {
+  console.log(`Room service listening on port ${PORT}`);
+});

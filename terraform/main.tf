@@ -48,6 +48,14 @@ resource "aws_security_group" "alb_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # For internal ALB: allow port 4000 for internal access
+  ingress {
+    from_port   = 4000
+    to_port     = 4000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Internal ALB, only VPC traffic
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -83,6 +91,7 @@ resource "aws_security_group" "ecs_sg" {
   }
 }
 
+# 1. Gateway API - Public ALB
 resource "aws_lb" "codeshare_alb" {
   name               = "codeshare-alb"
   internal           = false
@@ -108,6 +117,26 @@ resource "aws_lb_target_group" "gateway_tg" {
   }
 }
 
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.codeshare_alb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.gateway_tg.arn
+  }
+}
+
+# 2. Room Service - Internal ALB
+resource "aws_lb" "room_service_alb" {
+  name               = "room-service-alb"
+  internal           = true
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb_sg.id]
+  subnets            = data.aws_subnets.default.ids
+}
+
 resource "aws_lb_target_group" "room_tg" {
   name        = "room-tg"
   port        = 4000
@@ -125,16 +154,17 @@ resource "aws_lb_target_group" "room_tg" {
   }
 }
 
-resource "aws_lb_listener" "http" {
-  load_balancer_arn = aws_lb.codeshare_alb.arn
-  port              = 80
+resource "aws_lb_listener" "room_http" {
+  load_balancer_arn = aws_lb.room_service_alb.arn
+  port              = 4000
   protocol          = "HTTP"
-
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.gateway_tg.arn
+    target_group_arn = aws_lb_target_group.room_tg.arn
   }
 }
+
+# 3. ECS Task Definitions
 
 resource "aws_ecs_task_definition" "gateway" {
   family                   = "gateway-api"
@@ -158,9 +188,9 @@ resource "aws_ecs_task_definition" "gateway" {
       ]
       environment = [
         { name = "PORT", value = "8080" },
-        { name = "ROOM_SERVICE_URL", value = "http://room-service:4000" }
+        # Use the internal ALB DNS name for Room Service!
+        { name = "ROOM_SERVICE_URL", value = "http://${aws_lb.room_service_alb.dns_name}:4000" }
       ]
-      # logConfiguration removed to avoid CloudWatch errors
     }
   ])
 }
@@ -185,10 +215,11 @@ resource "aws_ecs_task_definition" "room" {
           protocol      = "tcp"
         }
       ]
-      # logConfiguration removed to avoid CloudWatch errors
     }
   ])
 }
+
+# 4. ECS Services
 
 resource "aws_ecs_service" "gateway" {
   name            = "gateway-api-service"
@@ -223,5 +254,9 @@ resource "aws_ecs_service" "room" {
     assign_public_ip = true
   }
 
-  # No load_balancer block for room-service, internal only
+  load_balancer {
+    target_group_arn = aws_lb_target_group.room_tg.arn
+    container_name   = "room-service"
+    container_port   = 4000
+  }
 }
